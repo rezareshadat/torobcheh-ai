@@ -1,0 +1,45 @@
+name: Build demo assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_assets.py'
+      - '.github/workflows/build-demo-assets.yml'
+      - 'index.html'
+      - 'docs/PROPOSAL.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install image, PDF, video dependencies
+        run: |
+          python -m pip install --quiet numpy pillow markdown playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-core ffmpeg
+      - name: Render assets from the live HTML source
+        run: python scripts/build_assets.py
+      - name: Commit rendered PDF, screenshots, and video
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/Torobcheh-Proposal.pdf screenshots/home.png screenshots/mobile.png demo/Torobcheh-Demo-V2.mp4
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Publish rendered proposal, screenshots and demo video"
+            git push origin HEAD:main
+          fi
